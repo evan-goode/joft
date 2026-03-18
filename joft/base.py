@@ -434,9 +434,17 @@ def apply_reference_pool_to_payload(
                     )
                     continue
 
-                if ref in fields[field]:
-                    fields[field] = replace_ref(fields[field], ref, v)
+                fields[field] = replace_ref(fields[field], ref, v)
 
 
-def replace_ref(field: str, ref: str, value: str) -> str:
-    return field.replace("${" + ref + "}", value)
+def replace_ref(field: Any, ref: str, value: str) -> Any:
+    """Replace ${ref} patterns in a string, or recursively in dicts and lists."""
+    if type(field) is str:
+        return field.replace("${" + ref + "}", value)
+    if type(field) is dict:
+        for key in field:
+            field[key] = replace_ref(field[key], ref, value)
+        return field
+    if type(field) is list:
+        return [replace_ref(item, ref, value) for item in field]
+    return field

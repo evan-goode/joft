@@ -220,6 +220,90 @@ def test_replace_ref() -> None:
     assert joft.base.replace_ref(field, reference_id, value) == f"This is {value}"
 
 
+def test_replace_ref_with_dict() -> None:
+    """Test that replace_ref recurses into dict values."""
+    field = {"key": "${epic.key}", "extra": "static"}
+    result = joft.base.replace_ref(field, "epic.key", "SWM-123")
+
+    assert result == {"key": "SWM-123", "extra": "static"}
+
+
+def test_replace_ref_with_nested_dict() -> None:
+    """Test that replace_ref recurses into deeply nested dicts."""
+    field = {"outer": {"inner": "${issue.key}"}}
+    result = joft.base.replace_ref(field, "issue.key", "TEST-100")
+
+    assert result == {"outer": {"inner": "TEST-100"}}
+
+
+def test_replace_ref_with_non_string_values() -> None:
+    """Test that replace_ref leaves non-string, non-dict values untouched."""
+    field = {"key": "${epic.key}", "count": 5, "flag": True}
+    result = joft.base.replace_ref(field, "epic.key", "SWM-123")
+
+    assert result == {"key": "SWM-123", "count": 5, "flag": True}
+
+
+def test_replace_ref_with_list() -> None:
+    """Test that replace_ref recurses into lists."""
+    field = [{"add": "${issue.label}"}]
+    result = joft.base.replace_ref(field, "issue.label", "my-label")
+
+    assert result == [{"add": "my-label"}]
+
+
+def test_replace_ref_with_list_of_strings() -> None:
+    """Test that replace_ref substitutes strings inside a list."""
+    field = ["${a}", "static", "${b}"]
+    result = joft.base.replace_ref(field, "a", "first")
+
+    assert result == ["first", "static", "${b}"]
+
+
+def test_list_fields() -> None:
+    """Test that list_fields returns a formatted table of custom fields."""
+    mock_jira = unittest.mock.MagicMock()
+    mock_jira.fields.return_value = [
+        {"id": "customfield_001", "name": "Story Points", "custom": True},
+        {"id": "customfield_002", "name": "Epic Link", "custom": True},
+        {"id": "summary", "name": "Summary", "custom": False},
+    ]
+
+    result = joft.base.list_fields(mock_jira)
+
+    assert "customfield_001" in result
+    assert "Story Points" in result
+    assert "customfield_002" in result
+    assert "Epic Link" in result
+    assert "Summary" not in result
+
+
+def test_list_fields_with_filter() -> None:
+    """Test that list_fields filters by name substring."""
+    mock_jira = unittest.mock.MagicMock()
+    mock_jira.fields.return_value = [
+        {"id": "customfield_001", "name": "Story Points", "custom": True},
+        {"id": "customfield_002", "name": "Epic Link", "custom": True},
+    ]
+
+    result = joft.base.list_fields(mock_jira, "story")
+
+    assert "Story Points" in result
+    assert "Epic Link" not in result
+
+
+def test_list_fields_no_results() -> None:
+    """Test that list_fields returns a message when no fields match."""
+    mock_jira = unittest.mock.MagicMock()
+    mock_jira.fields.return_value = [
+        {"id": "summary", "name": "Summary", "custom": False},
+    ]
+
+    result = joft.base.list_fields(mock_jira)
+
+    assert result == "No custom fields found."
+
+
 def test_apply_reference_pool_to_payload() -> None:
     """Test if references are replaced with actual values."""
 
@@ -263,6 +347,52 @@ def test_multiple_references_in_str_field() -> None:
 
     assert mock_reference_pool["issue.summary"] in mock_fields["summary"]
     assert mock_reference_pool["issue.key"] in mock_fields["summary"]
+
+
+def test_deep_substitution_in_dict_field() -> None:
+    """Test that references inside nested dict fields are substituted."""
+
+    mock_reference_pool = {
+        "bug-epic.key": "SWM-456",
+    }
+
+    mock_fields = {
+        "parent": {"key": "${bug-epic.key}"},
+    }
+    joft.base.apply_reference_pool_to_payload(mock_reference_pool, mock_fields)
+
+    assert mock_fields["parent"] == {"key": "SWM-456"}
+
+
+def test_deep_substitution_preserves_non_ref_keys() -> None:
+    """Test that non-reference values in nested dicts are preserved."""
+
+    mock_reference_pool = {
+        "epic.key": "SWM-789",
+    }
+
+    mock_fields = {
+        "parent": {"key": "${epic.key}", "extra": "untouched"},
+    }
+    joft.base.apply_reference_pool_to_payload(mock_reference_pool, mock_fields)
+
+    assert mock_fields["parent"]["key"] == "SWM-789"
+    assert mock_fields["parent"]["extra"] == "untouched"
+
+
+def test_deep_substitution_nested_two_levels() -> None:
+    """Test substitution works in deeply nested dicts."""
+
+    mock_reference_pool = {
+        "issue.key": "TEST-100",
+    }
+
+    mock_fields = {
+        "outer": {"inner": {"value": "${issue.key}"}},
+    }
+    joft.base.apply_reference_pool_to_payload(mock_reference_pool, mock_fields)
+
+    assert mock_fields["outer"]["inner"]["value"] == "TEST-100"
 
 
 @unittest.mock.patch("logging.info")
