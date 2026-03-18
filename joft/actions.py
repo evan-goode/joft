@@ -69,7 +69,12 @@ def update_ticket(
 
     logging.debug(f"Updating ticket '{ticket_to.key}'")
     logging.debug(f"Payload:\n{action.fields}")
-    ticket_to.update(action.fields)
+
+    update_ops = action.fields.pop("update", None)
+    if update_ops:
+        ticket_to.update(action.fields, update=update_ops)
+    else:
+        ticket_to.update(action.fields)
 
     logging.info(f"Ticket '{ticket_to.key}' updated.")
 

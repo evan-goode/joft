@@ -140,6 +140,35 @@ def test_update_ticket():
     mock_reference_issue.update.assert_called_once_with(update_ticket_action.fields)
 
 
+def test_update_ticket_with_update_operations():
+    """Test that the 'update' key is separated from fields and sent correctly."""
+    update_ticket_template = {
+        "object_id": "label-issue",
+        "type": "update-ticket",
+        "reference_id": "issue",
+        "fields": {
+            "update": {
+                "labels": [{"add": "has-triaging-spike"}],
+            },
+        },
+    }
+    update_ticket_action = joft.models.UpdateTicketAction(**update_ticket_template)
+
+    mock_jira_session = unittest.mock.MagicMock()
+
+    mock_reference_issue = unittest.mock.MagicMock()
+    mock_reference_issue.key = "RHEL-999"
+    mock_reference_pool = {"issue": mock_reference_issue}
+
+    joft.actions.update_ticket(
+        update_ticket_action, mock_jira_session, mock_reference_pool
+    )
+
+    mock_reference_issue.update.assert_called_once_with(
+        {}, update={"labels": [{"add": "has-triaging-spike"}]}
+    )
+
+
 def test_update_ticket_reference_invalid():
     """We should raise if a reference_id is invalid."""
 
