@@ -16,6 +16,21 @@ else:
     logging_level = logging.WARNING
 
 
+def new_jira_session(ctx: Dict[str, Dict[str, any]]) -> jira.JIRA:
+    server = ctx["jira"]["server"]
+    if "pat_token" in server:
+        logging.info("Authenticating with PAT (Personal Access Token)")
+        token_args = {
+            "token_auth": server["pat_token"]
+        }
+    elif "email" in server and "api_token" in server:
+        logging.info(f"Authenticating as {server["email"]} using API token")
+        token_args = {
+            "basic_auth": (server["email"], server["api_token"])
+        }
+    return jira.JIRA(server["hostname"], **token_args)
+
+
 @click.group()
 @click.option("--config", help="Path to the config file.")
 @click.pass_context
@@ -43,9 +58,7 @@ def run(ctx: Dict[str, Dict[str, Any]], template: str) -> int:
         f"Establishing session with jira server: {ctx['jira']['server']['hostname']}:"
     )
 
-    jira_session = jira.JIRA(
-        ctx["jira"]["server"]["hostname"], token_auth=ctx["jira"]["server"]["pat_token"]
-    )
+    jira_session = new_jira_session(ctx)
 
     logging.info("Session established...")
     logging.info(f"Executing Jira template: {template}")
@@ -64,9 +77,7 @@ def list_issues(ctx: Dict[str, Dict[str, Any]], template: str) -> None:
         f"Establishing session with jira server: {ctx['jira']['server']['hostname']}:"
     )
 
-    jira_session = jira.JIRA(
-        ctx["jira"]["server"]["hostname"], token_auth=ctx["jira"]["server"]["pat_token"]
-    )
+    jira_session = new_jira_session(ctx)
 
     logging.info("Session established...")
     logging.info(f"Executing trigger from Jira template: {template}")

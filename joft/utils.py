@@ -35,8 +35,10 @@ def read_and_validate_config(
         config = tomllib.load(fp)
 
     # Validate required fields exist
-    config["jira"]["server"]["hostname"]
-    config["jira"]["server"]["pat_token"]
+    server = config["jira"]["server"]
+    server["hostname"]
+    if "pat_token" not in server and ("api_token" not in server or "email" not in server):
+        raise KeyError("'server.pat_token' or ('server.email' and `server.api_token') is required. Refer to https://jira.readthedocs.io/examples.html#token-auth")
 
     return config
 

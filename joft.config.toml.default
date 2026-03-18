@@ -1,3 +1,11 @@
 [jira.server]
 hostname = "<your jira server url>"
+
+# Using Jira Self Hosted (incl. Jira Server/Data Center)
+# https://confluence.atlassian.com/enterprise/using-personal-access-tokens-1026032365.html
 pat_token = "<your jira pat token>"
+
+# Using Jira Cloud
+# https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account
+# email = "<your email address>"
+# api_token = "<your jira API token>"
