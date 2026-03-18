@@ -196,6 +196,164 @@ def test_update_ticket_reference_invalid():
     assert bad_reference_id in ex.value.args[0].lower()
 
 
+def test_add_to_sprint_next():
+    """Test that sprint: next resolves to the first future sprint."""
+    action_template = {
+        "type": "add-to-sprint",
+        "object_id": "add-spike-to-sprint",
+        "reference_id": "story-spike",
+        "board_id": 9908,
+        "sprint": "next",
+        "fields": {},
+    }
+    action = joft.models.AddToSprintAction(**action_template)
+
+    mock_jira_session = unittest.mock.MagicMock()
+
+    mock_sprint = unittest.mock.MagicMock()
+    mock_sprint.raw = {"id": 51, "name": "Sprint 51", "startDate": "2026-03-25"}
+    mock_jira_session.sprints.return_value = [mock_sprint]
+
+    mock_issue = unittest.mock.MagicMock()
+    mock_issue.key = "SWM-100"
+    mock_reference_pool = {"story-spike": mock_issue}
+
+    joft.actions.add_to_sprint(action, mock_jira_session, mock_reference_pool)
+
+    mock_jira_session.sprints.assert_called_once_with(9908, state="future")
+    mock_jira_session.add_issues_to_sprint.assert_called_once_with(51, ["SWM-100"])
+
+
+def test_add_to_sprint_next_falls_back_to_active():
+    """Test that sprint: next falls back to active sprint when no future sprints exist."""
+    action_template = {
+        "type": "add-to-sprint",
+        "object_id": "add-spike-to-sprint",
+        "reference_id": "story-spike",
+        "board_id": 9908,
+        "sprint": "next",
+        "fields": {},
+    }
+    action = joft.models.AddToSprintAction(**action_template)
+
+    mock_jira_session = unittest.mock.MagicMock()
+
+    mock_active_sprint = unittest.mock.MagicMock()
+    mock_active_sprint.raw = {"id": 50, "name": "Sprint 50"}
+    mock_jira_session.sprints.side_effect = [
+        [],                       # future: none
+        [mock_active_sprint],     # active: one
+    ]
+
+    mock_issue = unittest.mock.MagicMock()
+    mock_issue.key = "SWM-100"
+    mock_reference_pool = {"story-spike": mock_issue}
+
+    joft.actions.add_to_sprint(action, mock_jira_session, mock_reference_pool)
+
+    mock_jira_session.add_issues_to_sprint.assert_called_once_with(50, ["SWM-100"])
+
+
+def test_add_to_sprint_next_no_sprints_raises():
+    """Test that sprint: next raises when no future or active sprints exist."""
+    action_template = {
+        "type": "add-to-sprint",
+        "object_id": "add-spike-to-sprint",
+        "reference_id": "story-spike",
+        "board_id": 9908,
+        "sprint": "next",
+        "fields": {},
+    }
+    action = joft.models.AddToSprintAction(**action_template)
+
+    mock_jira_session = unittest.mock.MagicMock()
+    mock_jira_session.sprints.side_effect = [[], []]
+
+    mock_issue = unittest.mock.MagicMock()
+    mock_reference_pool = {"story-spike": mock_issue}
+
+    with pytest.raises(Exception) as ex:
+        joft.actions.add_to_sprint(action, mock_jira_session, mock_reference_pool)
+
+    assert "no future or active sprints" in ex.value.args[0].lower()
+
+
+def test_add_to_sprint_by_name():
+    """Test that an explicit sprint name is resolved by exact match."""
+    action_template = {
+        "type": "add-to-sprint",
+        "object_id": "add-spike-to-sprint",
+        "reference_id": "story-spike",
+        "board_id": 9908,
+        "sprint": "Sprint 50",
+        "fields": {},
+    }
+    action = joft.models.AddToSprintAction(**action_template)
+
+    mock_jira_session = unittest.mock.MagicMock()
+    mock_jira_session.sprints_by_name.return_value = {
+        "Sprint 50": {"id": 50, "name": "Sprint 50"},
+    }
+
+    mock_issue = unittest.mock.MagicMock()
+    mock_issue.key = "SWM-100"
+    mock_reference_pool = {"story-spike": mock_issue}
+
+    joft.actions.add_to_sprint(action, mock_jira_session, mock_reference_pool)
+
+    mock_jira_session.sprints_by_name.assert_called_once_with(9908, state="active,future")
+    mock_jira_session.add_issues_to_sprint.assert_called_once_with(50, ["SWM-100"])
+
+
+def test_add_to_sprint_unknown_name_raises():
+    """Test that add-to-sprint raises when explicit sprint name is not found."""
+    action_template = {
+        "type": "add-to-sprint",
+        "object_id": "add-spike-to-sprint",
+        "reference_id": "story-spike",
+        "board_id": 9908,
+        "sprint": "Nonexistent Sprint",
+        "fields": {},
+    }
+    action = joft.models.AddToSprintAction(**action_template)
+
+    mock_jira_session = unittest.mock.MagicMock()
+    mock_jira_session.sprints_by_name.return_value = {
+        "Sprint 50": {"id": 50},
+    }
+
+    mock_issue = unittest.mock.MagicMock()
+    mock_reference_pool = {"story-spike": mock_issue}
+
+    with pytest.raises(Exception) as ex:
+        joft.actions.add_to_sprint(action, mock_jira_session, mock_reference_pool)
+
+    assert "Nonexistent Sprint" in ex.value.args[0]
+    assert "not found" in ex.value.args[0].lower()
+
+
+def test_add_to_sprint_invalid_reference_raises():
+    """Test that add-to-sprint raises when reference_id is invalid."""
+    action_template = {
+        "type": "add-to-sprint",
+        "object_id": "add-spike-to-sprint",
+        "reference_id": "bad-ref",
+        "board_id": 9908,
+        "sprint": "next",
+        "fields": {},
+    }
+    action = joft.models.AddToSprintAction(**action_template)
+
+    mock_jira_session = unittest.mock.MagicMock()
+    mock_reference_pool = {}
+
+    with pytest.raises(Exception) as ex:
+        joft.actions.add_to_sprint(action, mock_jira_session, mock_reference_pool)
+
+    assert "invalid reference id" in ex.value.args[0].lower()
+    assert "bad-ref" in ex.value.args[0].lower()
+
+
 def test_link_ticket():
     """We test the link-issues action and it succesfull execution."""
     link_issue_template = {

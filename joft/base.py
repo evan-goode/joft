@@ -218,6 +218,12 @@ def execute_actions(
                     jira_session,
                     reference_pool,
                 )
+            case "add-to-sprint":
+                joft.actions.add_to_sprint(
+                    cast(joft.models.AddToSprintAction, copy.deepcopy(action)),
+                    jira_session,
+                    reference_pool,
+                )
             case _:
                 logging.warning(f"Unknown action type: {action.type}")
 

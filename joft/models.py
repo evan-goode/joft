@@ -104,6 +104,24 @@ class TransitionAction(Action):
                 self.reference_data.append(ReferenceData(**data))
 
 
+@dataclasses.dataclass(kw_only=True)
+class AddToSprintAction(Action):
+    reference_id: str
+    board_id: int
+    sprint: str
+    object_id: Optional[str] = None
+    reuse_data: dataclasses.InitVar[Optional[List[Dict[str, Any]]]] = None
+
+    reference_data: List[ReferenceData] = dataclasses.field(default_factory=list)
+
+    def __post_init__(self, reuse_data: Optional[List[Dict[str, Any]]]) -> None:
+        if reuse_data:
+            self.reuse_data_must_be_list(reuse_data)
+
+            for data in reuse_data:
+                self.reference_data.append(ReferenceData(**data))
+
+
 @dataclasses.dataclass
 class JiraTemplate:
     api_version: int
@@ -115,7 +133,7 @@ class JiraTemplate:
 
     # with default values processed in __post_init__
     jira_actions: List[
-        CreateTicketAction | UpdateTicketAction | LinkIssuesAction | TransitionAction
+        CreateTicketAction | UpdateTicketAction | LinkIssuesAction | TransitionAction | AddToSprintAction
     ] = dataclasses.field(default_factory=list)
 
     metadata: Optional[Dict[str, str]] = None
@@ -138,5 +156,7 @@ class JiraTemplate:
                     self.jira_actions.append(LinkIssuesAction(**action))
                 case "transition":
                     self.jira_actions.append(TransitionAction(**action))
+                case "add-to-sprint":
+                    self.jira_actions.append(AddToSprintAction(**action))
                 case _:
                     raise Exception(f"Unknown Action '{action['type']}'! Aborting...")
