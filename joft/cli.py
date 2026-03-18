@@ -15,7 +15,6 @@ if os.getenv("JOFT_DEBUG"):
 else:
     logging_level = logging.WARNING
 
-
 def new_jira_session(ctx: Dict[str, Dict[str, any]]) -> jira.JIRA:
     server = ctx["jira"]["server"]
     if "pat_token" in server:
@@ -66,6 +65,15 @@ def run(ctx: Dict[str, Dict[str, Any]], template: str) -> int:
     ret_code = joft.base.execute_template(template, jira_session)
 
     sys.exit(ret_code)
+
+
+@main.command(name="list-fields")
+@click.option("--filter", "name_filter", default="", help="Case-insensitive substring to filter field names.")
+@click.pass_obj
+def list_fields(ctx: Dict[str, Dict[str, Any]], name_filter: str) -> None:
+    logging.basicConfig(format="%(levelname)s:%(message)s", level=logging_level)
+    jira_session = new_jira_session(ctx)
+    print(joft.base.list_fields(jira_session, name_filter))
 
 
 @main.command(name="list-issues")

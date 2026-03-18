@@ -60,6 +60,31 @@ def search_issues(
     )
 
 
+def list_fields(jira_session: jira.JIRA, name_filter: str = "") -> str:
+    """Return a formatted table of custom fields from the Jira instance.
+
+    Args:
+        jira_session: Active JIRA client session.
+        name_filter: Optional case-insensitive substring to filter field names.
+
+    Returns:
+        A tabulate-formatted string listing matching custom fields.
+    """
+    fields = jira_session.fields()
+    custom = [f for f in fields if f.get("custom", False)]
+    if name_filter:
+        name_filter_lower = name_filter.lower()
+        custom = [f for f in custom if name_filter_lower in f["name"].lower()]
+
+    custom.sort(key=lambda f: f["name"])
+    rows = [[f["id"], f["name"]] for f in custom]
+
+    if not rows:
+        return "No custom fields found."
+
+    return tabulate.tabulate(rows, ["ID", "Name"])
+
+
 def list_issues(template_file_path: str, jira_session: jira.JIRA) -> str:
     jira_template = load_and_validate_template(template_file_path)
 
